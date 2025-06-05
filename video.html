@@ -57,48 +57,75 @@
             Qualquer tentativa de download ou cópia é bloqueada.
         </p>
 
-        <!-- Novo elemento para exibir o Referrer -->
+        <!-- Novo elemento para exibir o Referrer e o método de validação -->
         <div class="text-center text-xs text-gray-600 mt-4">
-            <p><strong>Referrer de Acesso:</strong> <!--<span id="referrer-display">N/A</span> --></p>
+            <p><strong>Status de Validação:</strong> <span id="validation-status">Aguardando...</span></p>
+            <p><strong>Referrer Detectado:</strong> <span id="referrer-display">N/A</span></p>
         </div>
     </div>
 
     <script>
         // URLs de exemplo para o MVP
-        const patreonDomain = 'patreon.com'; // Domínio do Patreon (para simulação de Referer)
+        const patreonDomain = 'https://www.patreon.com'; // Domínio do Patreon (para simulação de Referer)
         const actualVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4'; // URL de um vídeo de exemplo (substitua pelos seus do Gdrive/Mega/etc.)
         const institutionalVideoUrl = 'https://www.w3schools.com/html/movie.mp4'; // URL de vídeo institucional de exemplo
+
+        // Parâmetro de URL esperado para validação
+        const expectedQueryParamName = 'origem';
+        const expectedQueryParamValue = 'patreon';
 
         const videoWrapper = document.getElementById('video-wrapper');
         const loadingSpinner = document.getElementById('loading-spinner');
         const errorMessage = document.getElementById('error-message');
-        const referrerDisplay = document.getElementById('referrer-display'); // Referência ao novo elemento
+        const referrerDisplay = document.getElementById('referrer-display'); // Referência ao elemento de display do referrer
+        const validationStatusDisplay = document.getElementById('validation-status'); // Novo elemento para status de validação
 
-        // Função para simular a validação do referer no backend
-        // Na produção, esta lógica estaria em um servidor que retornaria a URL do vídeo apropriada.
+        // Função para obter um parâmetro da URL
+        function getQueryParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Função para simular a validação da origem
         async function simulateBackendValidation() {
             // Mostra o spinner de carregamento
             loadingSpinner.classList.remove('hidden');
             errorMessage.classList.add('hidden');
 
-            // Simula a verificação do cabeçalho 'Referer' que viria do navegador.
-            // Em um ambiente de produção real, você faria uma requisição AJAX/Fetch para
-            // o seu backend, e o backend verificaria o 'Referer' na requisição HTTP.
-            // Ele então retornaria a URL do vídeo (ou uma indicação de acesso negado).
-            const referer = document.referrer; // Obtém o referer atual do navegador
-            console.log('Referer detectado:', referer);
+            const referer = document.referrer;
+            const urlParam = getQueryParam(expectedQueryParamName);
 
-            // Exibe o referrer na página
+            // Atualiza o display do referrer
             referrerDisplay.textContent = referer || 'Nenhum referrer detectado';
 
             let sourceToLoad = '';
-            if (referer == patreonDomain) {
+            let validationMethod = '';
+            let isValid = false;
+
+            // 1. Prioriza a validação por parâmetro URL
+            if (urlParam === expectedQueryParamValue) {
+                isValid = true;
+                validationMethod = 'Via Parâmetro URL';
                 sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal.');
-            } else {
+                console.log('Acesso válido: Carregando vídeo principal via parâmetro URL.');
+            }
+            // 2. Fallback para validação por Referrer
+            else if (referer.startsWith(patreonDomain)) {
+                isValid = true;
+                validationMethod = 'Via Referrer';
+                sourceToLoad = actualVideoUrl;
+                console.log('Acesso válido: Carregando vídeo principal via Referrer.');
+            }
+            // 3. Acesso inválido
+            else {
+                isValid = false;
+                validationMethod = 'Inválido';
                 sourceToLoad = institutionalVideoUrl;
                 console.log('Acesso inválido: Carregando vídeo institucional.');
             }
+
+            // Atualiza o display de status de validação
+            validationStatusDisplay.textContent = `${validationMethod} (${isValid ? 'OK' : 'NEGADO'})`;
 
             // Esconde o spinner após a "validação"
             loadingSpinner.classList.add('hidden');
