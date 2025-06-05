@@ -65,7 +65,7 @@
 
     <script>
         // URLs de exemplo para o MVP
-        const patreonDomain = 'https://www.patreon.com'; // Domínio do Patreon (para simulação de Referer)
+        const patreonDomain = 'patreon.com'; // Domínio do Patreon (para simulação de Referer)
         const actualVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4'; // URL de um vídeo de exemplo (substitua pelos seus do Gdrive/Mega/etc.)
         const institutionalVideoUrl = 'https://www.w3schools.com/html/movie.mp4'; // URL de vídeo institucional de exemplo
 
@@ -92,7 +92,7 @@
             referrerDisplay.textContent = referer || 'Nenhum referrer detectado';
 
             let sourceToLoad = '';
-            if (referer.startsWith(patreonDomain)) {
+            if (referer == patreonDomain) {
                 sourceToLoad = actualVideoUrl;
                 console.log('Acesso válido: Carregando vídeo principal.');
             } else {
