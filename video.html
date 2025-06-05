@@ -60,7 +60,8 @@
         <!-- Novo elemento para exibir o Referrer e o método de validação -->
         <div class="text-center text-xs text-gray-600 mt-4">
             <p><strong>Status de Validação:</strong> <span id="validation-status">Aguardando...</span></p>
-            <p><strong>Referrer Detectado:</strong> <span id="referrer-display">N/A</span></p>
+            <p><strong>Referrer Detectado (JS):</strong> <span id="referrer-display-js">N/A</span></p>
+            <p><strong>Referrer Detectado (PHP - se aplicável):</strong> <span id="referrer-display-php">N/A</span></p>
         </div>
     </div>
 
@@ -77,8 +78,16 @@
         const videoWrapper = document.getElementById('video-wrapper');
         const loadingSpinner = document.getElementById('loading-spinner');
         const errorMessage = document.getElementById('error-message');
-        const referrerDisplay = document.getElementById('referrer-display'); // Referência ao elemento de display do referrer
+        const referrerDisplayJs = document.getElementById('referrer-display-js'); // Elemento para display do referrer via JS
+        const referrerDisplayPhp = document.getElementById('referrer-display-php'); // Elemento para display do referrer via PHP (se injetado)
         const validationStatusDisplay = document.getElementById('validation-status'); // Novo elemento para status de validação
+
+        // Variável que CONCEITUALMENTE seria populada pelo PHP no servidor
+        // Em um arquivo .php, você faria: const serverReferrer = "<?php echo isset($_SERVER['HTTP_REFERER']) ? htmlspecialchars($_SERVER['HTTP_REFERER']) : ''; ?>";
+        // No contexto estático, ela será vazia ou 'undefined' a menos que você a defina manualmente para testes.
+        const serverReferrer = ''; // placeholder para o valor vindo do PHP.
+                                   // Se esta página fosse servida por um servidor PHP, o PHP injetaria o valor aqui.
+
 
         // Função para obter um parâmetro da URL
         function getQueryParam(name) {
@@ -92,11 +101,12 @@
             loadingSpinner.classList.remove('hidden');
             errorMessage.classList.add('hidden');
 
-            const referer = document.referrer;
+            const jsReferrer = document.referrer;
             const urlParam = getQueryParam(expectedQueryParamName);
 
-            // Atualiza o display do referrer
-            referrerDisplay.textContent = referer || 'Nenhum referrer detectado';
+            // Atualiza os displays do referrer
+            referrerDisplayJs.textContent = jsReferrer || 'Nenhum (JS)';
+            referrerDisplayPhp.textContent = serverReferrer || 'Não Aplicável (PHP não em execução)';
 
             let sourceToLoad = '';
             let validationMethod = '';
@@ -109,14 +119,21 @@
                 sourceToLoad = actualVideoUrl;
                 console.log('Acesso válido: Carregando vídeo principal via parâmetro URL.');
             }
-            // 2. Fallback para validação por Referrer
-            else if (referer.startsWith(patreonDomain)) {
+            // 2. Tenta validação por Referrer PHP (se disponível)
+            else if (serverReferrer && serverReferrer.startsWith(patreonDomain)) {
                 isValid = true;
-                validationMethod = 'Via Referrer';
+                validationMethod = 'Via Referrer (PHP)';
                 sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal via Referrer.');
+                console.log('Acesso válido: Carregando vídeo principal via Referrer (PHP).');
             }
-            // 3. Acesso inválido
+            // 3. Fallback para validação por Referrer JS
+            else if (jsReferrer.startsWith(patreonDomain)) {
+                isValid = true;
+                validationMethod = 'Via Referrer (JS)';
+                sourceToLoad = actualVideoUrl;
+                console.log('Acesso válido: Carregando vídeo principal via Referrer (JS).');
+            }
+            // 4. Acesso inválido
             else {
                 isValid = false;
                 validationMethod = 'Inválido';
@@ -126,6 +143,8 @@
 
             // Atualiza o display de status de validação
             validationStatusDisplay.textContent = `${validationMethod} (${isValid ? 'OK' : 'NEGADO'})`;
+            validationStatusDisplay.className = `text-center text-xs mt-4 ${isValid ? 'text-green-500' : 'text-red-500'}`;
+
 
             // Esconde o spinner após a "validação"
             loadingSpinner.classList.add('hidden');
