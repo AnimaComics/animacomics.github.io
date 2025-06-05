@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conteúdo Exclusivo - Patreon</title>
+    <!-- Inclui o Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Define a fonte Inter para toda a página */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Esconde os controles de download padrão do navegador no vídeo */
+        video::-webkit-media-controls-enclosure {
+            overflow: hidden;
+        }
+        video::-webkit-media-controls-panel {
+            width: 100%;
+        }
+        /* Bloqueia o clique direito e a seleção de texto */
+        .no-select {
+            -webkit-user-select: none;  /* Safari */
+            -moz-user-select: none;     /* Firefox */
+            -ms-user-select: none;      /* IE 10+ */
+            user-select: none;          /* Standard syntax */
+        }
+        /* Impede eventos de ponteiro no vídeo para dificultar a interação de download */
+        .video-container video {
+            pointer-events: auto; /* Permite interações normais para os controles de reprodução */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-4xl no-select">
+        <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">
+            Bem-vindo ao Conteúdo Exclusivo!
+        </h1>
+
+        <div id="video-wrapper" class="relative pb-[56.25%] h-0 overflow-hidden rounded-lg mb-6 flex items-center justify-center bg-black">
+            <!-- O elemento <video> será injetado aqui pelo JavaScript -->
+            <div id="loading-spinner" class="flex flex-col items-center justify-center h-full w-full absolute top-0 left-0 bg-gray-800 rounded-lg">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+                <p class="ml-4 mt-4 text-lg">Carregando conteúdo...</p>
+            </div>
+            <div id="error-message" class="hidden absolute top-0 left-0 w-full h-full flex items-center justify-center bg-red-800 text-white text-xl rounded-lg">
+                <p>Não foi possível carregar o vídeo.</p>
+            </div>
+        </div>
+
+        <p class="text-center text-sm text-gray-400 mt-4">
+            Este conteúdo é exclusivo para apoiadores do Patreon.
+            Acesso liberado apenas via link direto do Patreon.
+        </p>
+        <p class="text-center text-xs text-gray-500 mt-2">
+            Qualquer tentativa de download ou cópia é bloqueada.
+        </p>
+
+        <!-- Elementos para exibir status de validação e informações de origem -->
+        <div class="text-center text-xs text-gray-600 mt-4">
+            <p><strong>Status de Validação:</strong> <span id="validation-status">Aguardando...</span></p>
+            <p><strong>Token de Validação (URL):</strong> <span id="token-display">N/A</span></p>
+            <p><strong>Referrer Detectado (JS):</strong> <span id="referrer-display-js">N/A</span></p>
+            <p><strong>Referrer Detectado (PHP - se aplicável):</strong> <span id="referrer-display-php">N/A</span></p>
+            <!-- Novo elemento para exibir todos os parâmetros GET -->
+            <div class="mt-4">
+                <p><strong>Parâmetros GET na URL:</strong></p>
+                <ul id="get-params-list" class="list-disc list-inside mx-auto w-fit text-left">
+                    <!-- Parâmetros serão injetados aqui -->
+                </ul>
+                <p id="no-params-message" class="text-center text-gray-700 mt-2 hidden">Nenhum parâmetro GET encontrado.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // URLs de exemplo para o MVP
+        const patreonDomain = 'https://www.patreon.com'; // Domínio do Patreon (para simulação de Referer)
+        const actualVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4'; // URL de um vídeo de exemplo (substitua pelos seus do Gdrive/Mega/etc.)
+        const institutionalVideoUrl = 'https://www.w3schools.com/html/movie.mp4'; // URL de vídeo institucional de exemplo
+
+        // Parâmetro de URL esperado para validação
+        const expectedQueryParamName = 'origem';
+        const expectedQueryParamValue = 'patreon';
+        const tokenQueryParamName = 'token'; // Nome do parâmetro para o token (mantido para exibição, mas não usado na validação)
+
+        const videoWrapper = document.getElementById('video-wrapper');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorMessage = document.getElementById('error-message');
+        const referrerDisplayJs = document.getElementById('referrer-display-js');
+        const referrerDisplayPhp = document.getElementById('referrer-display-php');
+        const validationStatusDisplay = document.getElementById('validation-status');
+        const tokenDisplay = document.getElementById('token-display');
+        const getParamsList = document.getElementById('get-params-list'); // Elemento para a lista de parâmetros GET
+        const noParamsMessage = document.getElementById('no-params-message'); // Elemento para a mensagem de nenhum parâmetro
+
+        // Variável que CONCEITUALMENTE seria populada pelo PHP no servidor
+        // (Mantida para fins de exibição, mas não usada na validação principal)
+        // Em um arquivo .php, você faria: const serverReferrer = "<?php echo isset($_SERVER['HTTP_REFERER']) ? htmlspecialchars($_SERVER['HTTP_REFERER']) : ''; ?>";
+        const serverReferrer = ''; // Placeholder para o valor vindo do PHP.
+
+
+        // Função para obter um parâmetro da URL
+        function getQueryParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Função para exibir todos os parâmetros GET na página
+        function displayAllQueryParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.size === 0) {
+                noParamsMessage.classList.remove('hidden');
+                getParamsList.innerHTML = ''; // Garante que a lista esteja vazia
+                return;
+            }
+
+            noParamsMessage.classList.add('hidden');
+            getParamsList.innerHTML = ''; // Limpa a lista antes de adicionar
+            for (const [key, value] of urlParams.entries()) {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${key}: "${value}"`;
+                getParamsList.appendChild(listItem);
+            }
+        }
+
+        // Função para simular a validação da origem
+        async function simulateBackendValidation() {
+            // Mostra o spinner de carregamento
+            loadingSpinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+
+            const jsReferrer = document.referrer;
+            const urlParamOrigem = getQueryParam(expectedQueryParamName);
+            const urlParamToken = getQueryParam(tokenQueryParamName); // Apenas para exibição
+
+            // Atualiza os displays dos referrers e do token
+            referrerDisplayJs.textContent = jsReferrer || 'Nenhum (JS)';
+            referrerDisplayPhp.textContent = serverReferrer || 'Não Aplicável (PHP não em execução)';
+            tokenDisplay.textContent = urlParamToken || 'Nenhum';
+
+            let sourceToLoad = '';
+            let validationMethod = '';
+            let isValid = false;
+
+            // NOVA LÓGICA DE VALIDAÇÃO: APENAS PELO PARÂMETRO 'origem'
+            if (urlParamOrigem === expectedQueryParamValue) {
+                isValid = true;
+                validationMethod = 'Via Parâmetro GET "origem"';
+                sourceToLoad = actualVideoUrl;
+                console.log('Acesso válido: Carregando vídeo principal via parâmetro GET "origem".');
+            }
+            // Acesso inválido se o parâmetro 'origem' não for encontrado ou não tiver o valor esperado
+            else {
+                isValid = false;
+                validationMethod = 'Inválido (Parâmetro "origem" ausente/incorreto)';
+                sourceToLoad = institutionalVideoUrl;
+                console.log('Acesso inválido: Carregando vídeo institucional.');
+            }
+
+            // Atualiza o display de status de validação
+            validationStatusDisplay.textContent = `${validationMethod} (${isValid ? 'OK' : 'NEGADO'})`;
+            validationStatusDisplay.className = `text-center text-xs mt-4 ${isValid ? 'text-green-500' : 'text-red-500'}`;
+
+
+            // Esconde o spinner após a "validação"
+            loadingSpinner.classList.add('hidden');
+
+            // Injeta o elemento de vídeo no DOM
+            if (sourceToLoad) {
+                const videoElement = document.createElement('video');
+                videoElement.controls = true;
+                videoElement.autoplay = true;
+                videoElement.className = 'absolute top-0 left-0 w-full h-full object-contain bg-black';
+                videoElement.oncontextmenu = (e) => e.preventDefault(); // Bloqueia clique direito no vídeo
+                videoElement.oncopy = (e) => e.preventDefault();
+                videoElement.oncut = (e) => e.preventDefault();
+                videoElement.onerror = () => {
+                    console.error("Erro ao carregar o vídeo.");
+                    videoElement.remove(); // Remove o vídeo com erro
+                    errorMessage.classList.remove('hidden'); // Exibe a mensagem de erro
+                };
+
+                const sourceElement = document.createElement('source');
+                sourceElement.src = sourceToLoad;
+                sourceElement.type = 'video/mp4'; // Adapte o tipo conforme o formato do seu vídeo
+
+                videoElement.appendChild(sourceElement);
+                videoElement.innerHTML += 'Seu navegador não suporta a tag de vídeo.'; // Fallback text
+                videoWrapper.appendChild(videoElement);
+            } else {
+                errorMessage.classList.remove('hidden'); // Exibe a mensagem de erro se não houver fonte
+            }
+        }
+
+        // Funções de manipulação de eventos globais para bloqueio
+        function handleContextMenu(e) {
+            e.preventDefault();
+        }
+
+        function handleCopyCut(e) {
+            e.preventDefault();
+            console.log('Tentativa de cópia/recorte bloqueada.');
+        }
+
+        // Adiciona os event listeners ao carregar a página
+        window.onload = function() {
+            simulateBackendValidation(); // Inicia a validação e o carregamento do vídeo
+            displayAllQueryParams(); // Exibe todos os parâmetros GET
+
+            document.addEventListener('contextmenu', handleContextMenu); // Bloqueia o clique direito em qualquer lugar
+            document.addEventListener('copy', handleCopyCut); // Bloqueia a cópia
+            document.addEventListener('cut', handleCopyCut); // Bloqueia o recorte
+        };
+    </script>
+</body>
+</html>
