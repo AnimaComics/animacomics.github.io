@@ -57,11 +57,20 @@
             Qualquer tentativa de download ou cópia é bloqueada.
         </p>
 
-        <!-- Novo elemento para exibir o Referrer e o método de validação -->
+        <!-- Elementos para exibir status de validação e informações de origem -->
         <div class="text-center text-xs text-gray-600 mt-4">
             <p><strong>Status de Validação:</strong> <span id="validation-status">Aguardando...</span></p>
+            <p><strong>Token de Validação (URL):</strong> <span id="token-display">N/A</span></p>
             <p><strong>Referrer Detectado (JS):</strong> <span id="referrer-display-js">N/A</span></p>
             <p><strong>Referrer Detectado (PHP - se aplicável):</strong> <span id="referrer-display-php">N/A</span></p>
+            <!-- Novo elemento para exibir todos os parâmetros GET -->
+            <div class="mt-4">
+                <p><strong>Parâmetros GET na URL:</strong></p>
+                <ul id="get-params-list" class="list-disc list-inside mx-auto w-fit text-left">
+                    <!-- Parâmetros serão injetados aqui -->
+                </ul>
+                <p id="no-params-message" class="text-center text-gray-700 mt-2 hidden">Nenhum parâmetro GET encontrado.</p>
+            </div>
         </div>
     </div>
 
@@ -74,25 +83,45 @@
         // Parâmetro de URL esperado para validação
         const expectedQueryParamName = 'origem';
         const expectedQueryParamValue = 'patreon';
+        const tokenQueryParamName = 'token'; // Nome do parâmetro para o token
 
         const videoWrapper = document.getElementById('video-wrapper');
         const loadingSpinner = document.getElementById('loading-spinner');
         const errorMessage = document.getElementById('error-message');
-        const referrerDisplayJs = document.getElementById('referrer-display-js'); // Elemento para display do referrer via JS
-        const referrerDisplayPhp = document.getElementById('referrer-display-php'); // Elemento para display do referrer via PHP (se injetado)
-        const validationStatusDisplay = document.getElementById('validation-status'); // Novo elemento para status de validação
+        const referrerDisplayJs = document.getElementById('referrer-display-js');
+        const referrerDisplayPhp = document.getElementById('referrer-display-php');
+        const validationStatusDisplay = document.getElementById('validation-status');
+        const tokenDisplay = document.getElementById('token-display');
+        const getParamsList = document.getElementById('get-params-list'); // Novo: elemento para a lista de parâmetros GET
+        const noParamsMessage = document.getElementById('no-params-message'); // Novo: elemento para a mensagem de nenhum parâmetro
 
         // Variável que CONCEITUALMENTE seria populada pelo PHP no servidor
         // Em um arquivo .php, você faria: const serverReferrer = "<?php echo isset($_SERVER['HTTP_REFERER']) ? htmlspecialchars($_SERVER['HTTP_REFERER']) : ''; ?>";
-        // No contexto estático, ela será vazia ou 'undefined' a menos que você a defina manualmente para testes.
-        const serverReferrer = ''; // placeholder para o valor vindo do PHP.
-                                   // Se esta página fosse servida por um servidor PHP, o PHP injetaria o valor aqui.
+        const serverReferrer = ''; // Placeholder para o valor vindo do PHP.
 
 
-        // Função para obter um parâmetro da URL
+        // Função para obter um parâmetro da URL (já existente, mas mantida)
         function getQueryParam(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
+        }
+
+        // Função para exibir todos os parâmetros GET na página
+        function displayAllQueryParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.size === 0) {
+                noParamsMessage.classList.remove('hidden');
+                getParamsList.innerHTML = ''; // Garante que a lista esteja vazia
+                return;
+            }
+
+            noParamsMessage.classList.add('hidden');
+            getParamsList.innerHTML = ''; // Limpa a lista antes de adicionar
+            for (const [key, value] of urlParams.entries()) {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${key}: "${value}"`;
+                getParamsList.appendChild(listItem);
+            }
         }
 
         // Função para simular a validação da origem
@@ -102,38 +131,57 @@
             errorMessage.classList.add('hidden');
 
             const jsReferrer = document.referrer;
-            const urlParam = getQueryParam(expectedQueryParamName);
+            const urlParamOrigem = getQueryParam(expectedQueryParamName);
+            const urlParamToken = getQueryParam(tokenQueryParamName);
 
-            // Atualiza os displays do referrer
+            // Atualiza os displays dos referrers e do token
             referrerDisplayJs.textContent = jsReferrer || 'Nenhum (JS)';
             referrerDisplayPhp.textContent = serverReferrer || 'Não Aplicável (PHP não em execução)';
+            tokenDisplay.textContent = urlParamToken || 'Nenhum';
 
             let sourceToLoad = '';
             let validationMethod = '';
             let isValid = false;
 
-            // 1. Prioriza a validação por parâmetro URL
-            if (urlParam === expectedQueryParamValue) {
+            // 1. Prioriza a validação por TOKEN (A MAIS SEGURA, REQUER BACKEND)
+            if (urlParamToken) {
+                // NESTE PONTO, VOCÊ FARIA UMA REQUISIÇÃO AJAX/FETCH PARA O SEU BACKEND
+                // PARA VALIDAR REALMENTE SE ESTE TOKEN É VÁLIDO E TEMPORÁRIO.
+                // Exemplo CONCEITUAL de requisição para backend:
+                // const response = await fetch(`/api/validate-token?token=${urlParamToken}`);
+                // const data = await response.json();
+                // if (data.isValid) { isValid = true; validationMethod = 'Via Token (Backend)'; }
+
+                // Para o MVP (sem backend real aqui), vamos SIMULAR que o token é válido:
+                // Se um token existe, consideramos válido para demonstração
+                isValid = true; // Altere para 'false' para simular token inválido
+                validationMethod = 'Via Token (Simulado)';
+                sourceToLoad = actualVideoUrl;
+                console.log('Acesso válido: Carregando vídeo principal via Token (simulado).');
+
+            }
+            // 2. Se não houver token, tenta validação por parâmetro 'origem'
+            else if (urlParamOrigem === expectedQueryParamValue) {
                 isValid = true;
                 validationMethod = 'Via Parâmetro URL';
                 sourceToLoad = actualVideoUrl;
                 console.log('Acesso válido: Carregando vídeo principal via parâmetro URL.');
             }
-            // 2. Tenta validação por Referrer PHP (se disponível)
+            // 3. Tenta validação por Referrer PHP (se injetado)
             else if (serverReferrer && serverReferrer.startsWith(patreonDomain)) {
                 isValid = true;
                 validationMethod = 'Via Referrer (PHP)';
                 sourceToLoad = actualVideoUrl;
                 console.log('Acesso válido: Carregando vídeo principal via Referrer (PHP).');
             }
-            // 3. Fallback para validação por Referrer JS
+            // 4. Fallback para validação por Referrer JS
             else if (jsReferrer.startsWith(patreonDomain)) {
                 isValid = true;
                 validationMethod = 'Via Referrer (JS)';
                 sourceToLoad = actualVideoUrl;
                 console.log('Acesso válido: Carregando vídeo principal via Referrer (JS).');
             }
-            // 4. Acesso inválido
+            // 5. Acesso inválido se nenhuma das anteriores for válida
             else {
                 isValid = false;
                 validationMethod = 'Inválido';
@@ -189,6 +237,7 @@
         // Adiciona os event listeners ao carregar a página
         window.onload = function() {
             simulateBackendValidation(); // Inicia a validação e o carregamento do vídeo
+            displayAllQueryParams(); // Exibe todos os parâmetros GET
 
             document.addEventListener('contextmenu', handleContextMenu); // Bloqueia o clique direito em qualquer lugar
             document.addEventListener('copy', handleCopyCut); // Bloqueia a cópia
