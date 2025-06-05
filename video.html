@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conteúdo Exclusivo - Patreon</title>
+    <title>Análise de Requisição HTTP</title>
     <!-- Inclui o Tailwind CSS para estilização -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
@@ -12,13 +12,6 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Esconde os controles de download padrão do navegador no vídeo */
-        video::-webkit-media-controls-enclosure {
-            overflow: hidden;
-        }
-        video::-webkit-media-controls-panel {
-            width: 100%;
-        }
         /* Bloqueia o clique direito e a seleção de texto */
         .no-select {
             -webkit-user-select: none;  /* Safari */
@@ -26,89 +19,65 @@
             -ms-user-select: none;      /* IE 10+ */
             user-select: none;          /* Standard syntax */
         }
-        /* Impede eventos de ponteiro no vídeo para dificultar a interação de download */
-        .video-container video {
-            pointer-events: auto; /* Permite interações normais para os controles de reprodução */
-        }
     </style>
 </head>
 <body class="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
     <div class="bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-4xl no-select">
         <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">
-            Bem-vindo ao Conteúdo Exclusivo!
+            Análise de Requisição HTTP (Lado do Cliente)
         </h1>
 
-        <div id="video-wrapper" class="relative pb-[56.25%] h-0 overflow-hidden rounded-lg mb-6 flex items-center justify-center bg-black">
-            <!-- O elemento <video> será injetado aqui pelo JavaScript -->
-            <div id="loading-spinner" class="flex flex-col items-center justify-center h-full w-full absolute top-0 left-0 bg-gray-800 rounded-lg">
-                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                <p class="ml-4 mt-4 text-lg">Carregando conteúdo...</p>
-            </div>
-            <div id="error-message" class="hidden absolute top-0 left-0 w-full h-full flex items-center justify-center bg-red-800 text-white text-xl rounded-lg">
-                <p>Não foi possível carregar o vídeo.</p>
-            </div>
-        </div>
-
-        <p class="text-center text-sm text-gray-400 mt-4">
-            Este conteúdo é exclusivo para apoiadores do Patreon.
-            Acesso liberado apenas via link direto do Patreon.
-        </p>
-        <p class="text-center text-xs text-gray-500 mt-2">
-            Qualquer tentativa de download ou cópia é bloqueada.
+        <p class="text-center text-sm text-gray-400 mb-4">
+            Abaixo estão as informações da requisição HTTP **disponíveis para o JavaScript no seu navegador**.
+            <br>Por motivos de segurança e privacidade, o JavaScript no navegador **não tem acesso a todos os cabeçalhos brutos da requisição HTTP**.
         </p>
 
-        <!-- Elementos para exibir status de validação e informações de origem -->
-        <div class="text-center text-xs text-gray-600 mt-4">
-            <p><strong>Status de Validação:</strong> <span id="validation-status">Aguardando...</span></p>
-            <p><strong>Token de Validação (URL):</strong> <span id="token-display">N/A</span></p>
-            <p><strong>Referrer Detectado (JS):</strong> <span id="referrer-display-js">N/A</span></p>
-            <p><strong>Referrer Detectado (PHP - se aplicável):</strong> <span id="referrer-display-php">N/A</span></p>
-            <!-- Novo elemento para exibir todos os parâmetros GET -->
+        <!-- Seção para exibir as informações da requisição -->
+        <div class="text-left text-sm text-gray-300 mt-6 p-4 bg-gray-700 rounded-md">
+            <h2 class="text-xl font-bold mb-3 text-blue-300">Dados da Requisição (Detectados pelo Navegador)</h2>
+
+            <p class="mb-2"><strong>URL Completa da Página:</strong> <span id="full-url-display" class="break-words text-yellow-300">N/A</span></p>
+            <p class="mb-2"><strong>Referrer (Página de Origem - JS):</strong> <span id="referrer-display-js" class="break-words text-yellow-300">N/A</span></p>
+            <p class="mb-2"><strong>Referrer (Página de Origem - PHP - se aplicável):</strong> <span id="referrer-display-php" class="break-words text-yellow-300">N/A</span></p>
+            <p class="mb-2"><strong>User-Agent do Navegador:</strong> <span id="user-agent-display" class="break-words text-yellow-300">N/A</span></p>
+
             <div class="mt-4">
-                <p><strong>Parâmetros GET na URL:</strong></p>
-                <ul id="get-params-list" class="list-disc list-inside mx-auto w-fit text-left">
+                <p class="mb-2"><strong>String de Parâmetros GET (window.location.search):</strong> <span id="raw-query-string" class="break-words text-yellow-300">N/A</span></p>
+                <p class="font-bold mb-1">Parâmetros GET Encontrados:</p>
+                <ul id="get-params-list" class="list-disc list-inside ml-4 text-yellow-300">
                     <!-- Parâmetros serão injetados aqui -->
                 </ul>
-                <p id="no-params-message" class="text-center text-gray-700 mt-2 hidden">Nenhum parâmetro GET encontrado.</p>
+                <p id="no-params-message" class="text-gray-500 mt-2 hidden">Nenhum parâmetro GET encontrado na URL.</p>
             </div>
         </div>
+
+        <p class="text-center text-xs text-gray-500 mt-6">
+            Esta página está focada na exibição dos dados da requisição para depuração de origem.
+        </p>
     </div>
 
     <script>
-        // URLs de exemplo para o MVP
-        const patreonDomain = 'https://www.patreon.com'; // Domínio do Patreon (para simulação de Referer)
-        const actualVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4'; // URL de um vídeo de exemplo (substitua pelos seus do Gdrive/Mega/etc.)
-        const institutionalVideoUrl = 'https://www.w3schools.com/html/movie.mp4'; // URL de vídeo institucional de exemplo
-
-        // Parâmetro de URL esperado para validação
-        const expectedQueryParamName = 'origem';
-        const expectedQueryParamValue = 'patreon';
-        const tokenQueryParamName = 'token'; // Nome do parâmetro para o token
-
-        const videoWrapper = document.getElementById('video-wrapper');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const errorMessage = document.getElementById('error-message');
+        // Referências aos elementos HTML
+        const fullUrlDisplay = document.getElementById('full-url-display');
         const referrerDisplayJs = document.getElementById('referrer-display-js');
         const referrerDisplayPhp = document.getElementById('referrer-display-php');
-        const validationStatusDisplay = document.getElementById('validation-status');
-        const tokenDisplay = document.getElementById('token-display');
-        const getParamsList = document.getElementById('get-params-list'); // Novo: elemento para a lista de parâmetros GET
-        const noParamsMessage = document.getElementById('no-params-message'); // Novo: elemento para a mensagem de nenhum parâmetro
+        const userAgentDisplay = document.getElementById('user-agent-display');
+        const rawQueryStringDisplay = document.getElementById('raw-query-string');
+        const getParamsList = document.getElementById('get-params-list');
+        const noParamsMessage = document.getElementById('no-params-message');
 
-        // Variável que CONCEITUALMENTE seria populada pelo PHP no servidor
-        // Em um arquivo .php, você faria: const serverReferrer = "<?php echo isset($_SERVER['HTTP_REFERER']) ? htmlspecialchars($_SERVER['HTTP_REFERER']) : ''; ?>";
-        const serverReferrer = ''; // Placeholder para o valor vindo do PHP.
-
-
-        // Função para obter um parâmetro da URL (já existente, mas mantida)
-        function getQueryParam(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
-        }
+        // Variável que CONCEITUALMENTE seria populada pelo PHP no servidor.
+        // Em um arquivo .php, para injetar o valor do HTTP_REFERER, você faria:
+        // const serverReferrer = "<?php echo isset($_SERVER['HTTP_REFERER']) ? htmlspecialchars($_SERVER['HTTP_REFERER']) : ''; ?>";
+        // No contexto atual de HTML/JS estático, ela permanecerá vazia.
+        const serverReferrer = ''; 
 
         // Função para exibir todos os parâmetros GET na página
         function displayAllQueryParams() {
             const urlParams = new URLSearchParams(window.location.search);
+            // Exibe a string bruta de parâmetros GET
+            rawQueryStringDisplay.textContent = window.location.search || 'Nenhum';
+
             if (urlParams.size === 0) {
                 noParamsMessage.classList.remove('hidden');
                 getParamsList.innerHTML = ''; // Garante que a lista esteja vazia
@@ -124,124 +93,24 @@
             }
         }
 
-        // Função para simular a validação da origem
-        async function simulateBackendValidation() {
-            // Mostra o spinner de carregamento
-            loadingSpinner.classList.remove('hidden');
-            errorMessage.classList.add('hidden');
-
-            const jsReferrer = document.referrer;
-            const urlParamOrigem = getQueryParam(expectedQueryParamName);
-            const urlParamToken = getQueryParam(tokenQueryParamName);
-
-            // Atualiza os displays dos referrers e do token
-            referrerDisplayJs.textContent = jsReferrer || 'Nenhum (JS)';
+        // Função para coletar e exibir todas as informações da requisição disponíveis
+        function displayRequestInfo() {
+            fullUrlDisplay.textContent = window.location.href || 'N/A';
+            referrerDisplayJs.textContent = document.referrer || 'Nenhum (JS)';
             referrerDisplayPhp.textContent = serverReferrer || 'Não Aplicável (PHP não em execução)';
-            tokenDisplay.textContent = urlParamToken || 'Nenhum';
+            userAgentDisplay.textContent = navigator.userAgent || 'N/A';
 
-            let sourceToLoad = '';
-            let validationMethod = '';
-            let isValid = false;
-
-            // 1. Prioriza a validação por TOKEN (A MAIS SEGURA, REQUER BACKEND)
-            if (urlParamToken) {
-                // NESTE PONTO, VOCÊ FARIA UMA REQUISIÇÃO AJAX/FETCH PARA O SEU BACKEND
-                // PARA VALIDAR REALMENTE SE ESTE TOKEN É VÁLIDO E TEMPORÁRIO.
-                // Exemplo CONCEITUAL de requisição para backend:
-                // const response = await fetch(`/api/validate-token?token=${urlParamToken}`);
-                // const data = await response.json();
-                // if (data.isValid) { isValid = true; validationMethod = 'Via Token (Backend)'; }
-
-                // Para o MVP (sem backend real aqui), vamos SIMULAR que o token é válido:
-                // Se um token existe, consideramos válido para demonstração
-                isValid = true; // Altere para 'false' para simular token inválido
-                validationMethod = 'Via Token (Simulado)';
-                sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal via Token (simulado).');
-
-            }
-            // 2. Se não houver token, tenta validação por parâmetro 'origem'
-            else if (urlParamOrigem === expectedQueryParamValue) {
-                isValid = true;
-                validationMethod = 'Via Parâmetro URL';
-                sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal via parâmetro URL.');
-            }
-            // 3. Tenta validação por Referrer PHP (se injetado)
-            else if (serverReferrer && serverReferrer.startsWith(patreonDomain)) {
-                isValid = true;
-                validationMethod = 'Via Referrer (PHP)';
-                sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal via Referrer (PHP).');
-            }
-            // 4. Fallback para validação por Referrer JS
-            else if (jsReferrer.startsWith(patreonDomain)) {
-                isValid = true;
-                validationMethod = 'Via Referrer (JS)';
-                sourceToLoad = actualVideoUrl;
-                console.log('Acesso válido: Carregando vídeo principal via Referrer (JS).');
-            }
-            // 5. Acesso inválido se nenhuma das anteriores for válida
-            else {
-                isValid = false;
-                validationMethod = 'Inválido';
-                sourceToLoad = institutionalVideoUrl;
-                console.log('Acesso inválido: Carregando vídeo institucional.');
-            }
-
-            // Atualiza o display de status de validação
-            validationStatusDisplay.textContent = `${validationMethod} (${isValid ? 'OK' : 'NEGADO'})`;
-            validationStatusDisplay.className = `text-center text-xs mt-4 ${isValid ? 'text-green-500' : 'text-red-500'}`;
-
-
-            // Esconde o spinner após a "validação"
-            loadingSpinner.classList.add('hidden');
-
-            // Injeta o elemento de vídeo no DOM
-            if (sourceToLoad) {
-                const videoElement = document.createElement('video');
-                videoElement.controls = true;
-                videoElement.autoplay = true;
-                videoElement.className = 'absolute top-0 left-0 w-full h-full object-contain bg-black';
-                videoElement.oncontextmenu = (e) => e.preventDefault(); // Bloqueia clique direito no vídeo
-                videoElement.oncopy = (e) => e.preventDefault();
-                videoElement.oncut = (e) => e.preventDefault();
-                videoElement.onerror = () => {
-                    console.error("Erro ao carregar o vídeo.");
-                    videoElement.remove(); // Remove o vídeo com erro
-                    errorMessage.classList.remove('hidden'); // Exibe a mensagem de erro
-                };
-
-                const sourceElement = document.createElement('source');
-                sourceElement.src = sourceToLoad;
-                sourceElement.type = 'video/mp4'; // Adapte o tipo conforme o formato do seu vídeo
-
-                videoElement.appendChild(sourceElement);
-                videoElement.innerHTML += 'Seu navegador não suporta a tag de vídeo.'; // Fallback text
-                videoWrapper.appendChild(videoElement);
-            } else {
-                errorMessage.classList.remove('hidden'); // Exibe a mensagem de erro se não houver fonte
-            }
+            displayAllQueryParams(); // Chama a função para exibir os parâmetros GET
         }
 
-        // Funções de manipulação de eventos globais para bloqueio
-        function handleContextMenu(e) {
-            e.preventDefault();
-        }
-
-        function handleCopyCut(e) {
-            e.preventDefault();
-            console.log('Tentativa de cópia/recorte bloqueada.');
-        }
-
-        // Adiciona os event listeners ao carregar a página
+        // Adiciona os event listeners e inicia a exibição de informações ao carregar a página
         window.onload = function() {
-            simulateBackendValidation(); // Inicia a validação e o carregamento do vídeo
-            displayAllQueryParams(); // Exibe todos os parâmetros GET
+            displayRequestInfo(); // Inicia a coleta e exibição das informações da requisição
 
-            document.addEventListener('contextmenu', handleContextMenu); // Bloqueia o clique direito em qualquer lugar
-            document.addEventListener('copy', handleCopyCut); // Bloqueia a cópia
-            document.addEventListener('cut', handleCopyCut); // Bloqueia o recorte
+            // Mantém os bloqueios básicos contra clique direito e cópia/recorte
+            document.addEventListener('contextmenu', (e) => e.preventDefault());
+            document.addEventListener('copy', (e) => { e.preventDefault(); console.log('Tentativa de cópia bloqueada.'); });
+            document.addEventListener('cut', (e) => { e.preventDefault(); console.log('Tentativa de recorte bloqueada.'); });
         };
     </script>
 </body>
